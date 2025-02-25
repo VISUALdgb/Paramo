@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet-search.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet-search.js"></script>
+        <script src="data/Paramos_wgs84_1.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+            highlightLayer.openPopup();
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        })
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // add class to format popup if it contains media
+		function addClassToPopupIfMedia(content, popup) {
+			var tempDiv = document.createElement('div');
+			tempDiv.innerHTML = content;
+			if (tempDiv.querySelector('td img')) {
+				popup._contentNode.classList.add('media');
+					// Delay to force the redraw
+					setTimeout(function() {
+						popup.update();
+					}, 10);
+			} else {
+				popup._contentNode.classList.remove('media');
+			}
+		}
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+            if (bounds_group.getLayers().length) {
+                map.fitBounds(bounds_group.getBounds());
+            }
+        }
+        map.createPane('pane_GoogleSatellite_0');
+        map.getPane('pane_GoogleSatellite_0').style.zIndex = 400;
+        var layer_GoogleSatellite_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_0',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data ©2015 Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleSatellite_0;
+        map.addLayer(layer_GoogleSatellite_0);
+        function pop_Paramos_wgs84_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Id'] !== null ? autolinker.link(String(feature.properties['Id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Nombre" colspan="2"><strong>Nombre</strong><br />' + (feature.properties['Nombre'] !== null ? autolinker.link(String(feature.properties['Nombre']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Escala'] !== null ? autolinker.link(String(feature.properties['Escala']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Acto_Admin'] !== null ? autolinker.link(String(feature.properties['Acto_Admin']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Fecha_Acto'] !== null ? autolinker.link(String(feature.properties['Fecha_Acto']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['No_Poligon'] !== null ? autolinker.link(String(feature.properties['No_Poligon']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Fuente'] !== null ? autolinker.link(String(feature.properties['Fuente']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Area_Ha'] !== null ? autolinker.link(String(feature.properties['Area_Ha']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Fecha_Ingr'] !== null ? autolinker.link(String(feature.properties['Fecha_Ingr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Fecha_Reco'] !== null ? autolinker.link(String(feature.properties['Fecha_Reco']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(String(feature.properties['Shape_Leng']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Area'] !== null ? autolinker.link(String(feature.properties['Shape_Area']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Paramos_wgs84_1_0(feature) {
+            switch(String(feature.properties['Nombre'])) {
+                case 'Almorzadero':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(153,59,220,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Altiplano Cundiboyacense':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(233,64,17,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Belmira – Santa Inés':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(19,225,184,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Cerro Plateado':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(87,210,226,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Chiles Cumbal':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(216,129,139,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Chilí - Barrangán':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(226,202,64,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Chingaza':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(227,69,164,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Citará':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(227,229,131,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Cruz Verde - Sumapaz':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(41,222,37,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Doña Juana - Chimayoy':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(43,135,210,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'El Duende':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(48,226,217,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Farallones de Cali':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(123,216,166,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Frontino – Urrao “Del Sol Las Alegrías':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(44,157,202,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Guanacas - Puracé - Coconucos':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(36,78,218,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Guantiva - La Rusia':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(93,47,220,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Guerrero':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(217,135,130,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Iguaque - Merchán':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(36,16,209,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Jurisdicciones- Santurbán- Berlín':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(64,221,32,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'La Cocha Patascoy':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(50,117,218,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Las Baldias':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(223,95,21,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Las Hermosas':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(26,220,55,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Los Nevados':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(205,32,165,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Los Picachos':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(87,93,221,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Miraflores':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(110,232,49,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Nevado del Huila - Moras':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(128,70,205,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Paramillo':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(166,236,95,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Perija':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(239,78,148,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Rabanal y río Bogotá':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(212,163,49,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Sierra Nevada de Santa Marta':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(159,32,201,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Sierra Nevada del Cocuy
+':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(116,221,183,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Sonsón':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(220,94,232,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Sotará':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(223,24,81,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Tamá':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(208,230,111,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Tatamá':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(227,141,42,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Tota - Bijagual - Mamapacha':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(32,203,86,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Yariguíes':
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(197,236,119,1.0)',
+                interactive: true,
+            }
+                    break;
+                default:
+                    return {
+                pane: 'pane_Paramos_wgs84_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(232,80,219,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Paramos_wgs84_1');
+        map.getPane('pane_Paramos_wgs84_1').style.zIndex = 401;
+        map.getPane('pane_Paramos_wgs84_1').style['mix-blend-mode'] = 'normal';
+        var layer_Paramos_wgs84_1 = new L.geoJson(json_Paramos_wgs84_1, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Paramos_wgs84_1',
+            layerName: 'layer_Paramos_wgs84_1',
+            pane: 'pane_Paramos_wgs84_1',
+            onEachFeature: pop_Paramos_wgs84_1,
+            style: style_Paramos_wgs84_1_0,
+        });
+        bounds_group.addLayer(layer_Paramos_wgs84_1);
+        map.addLayer(layer_Paramos_wgs84_1);
+        var overlaysTree = [
+            {label: 'Paramos_wgs84<br /><table><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Almorzadero0.png" /></td><td>Almorzadero</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_AltiplanoCundiboyacense1.png" /></td><td>Altiplano Cundiboyacense</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_BelmiraSantaInés2.png" /></td><td>Belmira – Santa Inés</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_CerroPlateado3.png" /></td><td>Cerro Plateado</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_ChilesCumbal4.png" /></td><td>Chiles Cumbal</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_ChilíBarrangán5.png" /></td><td>Chilí - Barrangán</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Chingaza6.png" /></td><td>Chingaza</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Citará7.png" /></td><td>Citará</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_CruzVerdeSumapaz8.png" /></td><td>Cruz Verde - Sumapaz</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_DoñaJuanaChimayoy9.png" /></td><td>Doña Juana - Chimayoy</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_ElDuende10.png" /></td><td>El Duende</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_FarallonesdeCali11.png" /></td><td>Farallones de Cali</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_FrontinoUrraoDelSolLasAlegrías12.png" /></td><td>Frontino – Urrao “Del Sol Las Alegrías</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_GuanacasPuracéCoconucos13.png" /></td><td>Guanacas - Puracé - Coconucos</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_GuantivaLaRusia14.png" /></td><td>Guantiva - La Rusia</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Guerrero15.png" /></td><td>Guerrero</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_IguaqueMerchán16.png" /></td><td>Iguaque - Merchán</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_JurisdiccionesSanturbánBerlín17.png" /></td><td>Jurisdicciones- Santurbán- Berlín</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_LaCochaPatascoy18.png" /></td><td>La Cocha Patascoy</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_LasBaldias19.png" /></td><td>Las Baldias</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_LasHermosas20.png" /></td><td>Las Hermosas</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_LosNevados21.png" /></td><td>Los Nevados</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_LosPicachos22.png" /></td><td>Los Picachos</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Miraflores23.png" /></td><td>Miraflores</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_NevadodelHuilaMoras24.png" /></td><td>Nevado del Huila - Moras</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Paramillo25.png" /></td><td>Paramillo</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Perija26.png" /></td><td>Perija</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_RabanalyríoBogotá27.png" /></td><td>Rabanal y río Bogotá</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_SierraNevadadeSantaMarta28.png" /></td><td>Sierra Nevada de Santa Marta</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_SierraNevadadelCocuy29.png" /></td><td>Sierra Nevada del Cocuy
+</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Sonsón30.png" /></td><td>Sonsón</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Sotará31.png" /></td><td>Sotará</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Tamá32.png" /></td><td>Tamá</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Tatamá33.png" /></td><td>Tatamá</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_TotaBijagualMamapacha34.png" /></td><td>Tota - Bijagual - Mamapacha</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_Yariguíes35.png" /></td><td>Yariguíes</td></tr><tr><td style="text-align: center;"><img src="legend/Paramos_wgs84_1_36.png" /></td><td></td></tr></table>', layer: layer_Paramos_wgs84_1},
+            {label: "Google Satellite", layer: layer_GoogleSatellite_0, radioGroup: 'bm' },]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        var i = 0;
+        layer_Paramos_wgs84_1.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['Nombre'] !== null?String('<div style="color: #323232; font-size: 10pt; font-family: \'Open Sans\', sans-serif;">' + layer.feature.properties['Nombre']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_Paramos_wgs84_1'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+        map.addControl(new L.Control.Search({
+            layer: layer_Paramos_wgs84_1,
+            initial: false,
+            hideMarkerOnCollapse: true,
+            propertyName: 'Nombre'}));
+        document.getElementsByClassName('search-button')[0].className +=
+         ' fa fa-binoculars';
+        resetLabels([layer_Paramos_wgs84_1]);
+        map.on("zoomend", function(){
+            resetLabels([layer_Paramos_wgs84_1]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_Paramos_wgs84_1]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_Paramos_wgs84_1]);
+        });
+        </script>
+    </body>
+</html>
